@@ -1,5 +1,7 @@
 # Vision-based Communication Project
 
+<!-- > **Note:** Due to the sensitive nature of this project, the source code is not publicly available. -->
+
 ## Description
 
 This repo, Vision-based Communications with Object Tracking, implements a vision-guided beamforming pipeline for vehicular wireless links: YOLO detects vehicles, a Kalman filter refines their trajectories, and linear regression predicts future positions so the antenna can pre-steer, mitigating latency-induced misalignment, preserving gain, and boosting data rates; the repository includes reproducible highway and urban simulations benchmarking the predictive approach against a conventional baseline, complete with metrics, plots, and notebooks for rapid evaluation.
