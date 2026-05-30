@@ -1,144 +1,138 @@
-# Vision-based Communication Project
+# Vision-based Communication with Object Tracking
 
-<!-- > **Note:** Due to the sensitive nature of this project, the source code is not publicly available. -->
+> **Note:** This project was developed at the **Sejong University VLI Lab**. Source code is not publicly available due to confidentiality restrictions.
 
-## Description
+## Highlights
 
-This repo, Vision-based Communications with Object Tracking, implements a vision-guided beamforming pipeline for vehicular wireless links: YOLO detects vehicles, a Kalman filter refines their trajectories, and linear regression predicts future positions so the antenna can pre-steer, mitigating latency-induced misalignment, preserving gain, and boosting data rates; the repository includes reproducible highway and urban simulations benchmarking the predictive approach against a conventional baseline, complete with metrics, plots, and notebooks for rapid evaluation.
+- **+20–29% average data rate improvement** over conventional delayed-detection beamforming across all scenarios
+- **Vision-guided predictive beamforming** — YOLO11 detects vehicles, ByteTrack maintains identity, linear prediction forecasts position to overcome latency
+- **Validated on real-world data** — DeepSense 6G dataset with synchronized camera, GPS, LiDAR, and wireless signals
+- **End-to-end pipeline** — from raw camera frames to antenna gain and spectral efficiency (bps/Hz)
+
+---
+
+## Demo
+
+![Demo 1](docs/demo1.png)
+
+![Demo 2](docs/demo2.png)
+
+---
+
+## Results
+
+*DeepSense 6G dataset · 960×540 resolution · 30 fps tracking · SNR range 0–30 dB*
+
+| Scenario | Baseline Rate | **Proposed Rate** | Improvement |
+|---|---|---|---|
+| A (Scenario 13) | 2.786 bps/Hz | **3.592 bps/Hz** | **+28.93%** |
+| B (Scenario 9) | 2.999 bps/Hz | **3.605 bps/Hz** | **+20.19%** |
+| C (Scenario 3) | 2.759 bps/Hz | **3.529 bps/Hz** | **+27.93%** |
+
+The predictive method consistently outperformed the baseline across all three real-world driving scenarios. The largest gain — **nearly 29%** — was achieved in Scenario A (highway driving).
+
+**Why it works:** Beamforming requires precise antenna alignment with the target vehicle. The baseline system steers the beam toward the *last known position*, so it always lags behind a moving vehicle. The proposed system forecasts *where the vehicle will be* when the beam forms and steers there instead — cutting pointing error and preserving antenna gain.
+
+---
+
+## Problem
+
+**Challenge:** Moving vehicles in vehicular communication introduce a delay between camera-based perception and beam actuation. This latency causes pointing errors, reduced antenna gain, and lower data throughput.
+
+**Goal:** Minimize beam misalignment by predicting vehicle position ahead of beam assignment, rather than reacting to delayed detections.
+
+**Approach:** A lightweight prediction layer on top of a standard vision pipeline — no additional sensors required.
+
+---
+
+## Pipeline
+
+```
+Camera Frame → YOLO11 Detection → ByteTrack Tracking → Linear Position Prediction
+                                                              ↓
+Data Rate ← Antenna Gain Estimation ← Angular Error ← 2D→3D Coordinate Mapping
+```
+
+| Step | Component | Role |
+|---|---|---|
+| 1 | **YOLO11** | Detect vehicles in each frame (`car` class) |
+| 2 | **ByteTrack** | Maintain identity across consecutive frames |
+| 3 | **Linear Predictor** | Estimate future bounding box from recent motion history |
+| 4 | **2D→3D Mapping** | Convert image coordinates to azimuth/elevation angles |
+| 5 | **Angular Error** | Compute angular difference between predicted and ground-truth beams |
+| 6 | **Antenna Gain** | Estimate gain loss from misalignment |
+| 7 | **Data Rate** | Compute average spectral efficiency across SNR values |
+
+### Baseline vs. Proposed
+
+| | Baseline | Proposed |
+|---|---|---|
+| Steering target | Last detected position | **Predicted future position** |
+| Latency handling | None — beam lags behind vehicle | Compensates for perception-to-actuation delay |
+| Result | Lower gain, lower throughput | Higher gain, **+20–29% data rate** |
+
+### Dataset
+
+**DeepSense 6G** — a multi-modal dataset providing synchronized camera, GPS, LiDAR, radar, and wireless communication signals from real-world driving. Three scenarios were used, each containing thousands of frames at 960×540 resolution.
+
+---
+
+## Quick Start
+
+```bash
+# Clone
+git clone https://github.com/lexuanhoang120/Vision-based-Communication
+cd Vision-based-Communication
+
+# Install
+pip install -r requirements.txt
+
+# Detect vehicles
+python src/detection/detector.py \
+    --source_dir datasets/Data4Simulation \
+    --conf_score 0.5 --visualize --save_results
+
+# Track objects
+python src/tracking/tracker.py \
+    --input_type folder --input_path datasets/Data4Simulation \
+    --save_output --fps 10
+
+# Evaluate communication performance
+python src/evaluation/evaluator.py \
+    --input_detection_json detection_results.json \
+    --window_size 5
+```
+
+YOLO11n weights are downloaded automatically on first run.
+
+---
 
 ## Project Structure
 
-```
-Vision-based-Communication/
-├── src/                          # Source code directory
-│   ├── detection/                # Object detection modules
-│   │   ├── __init__.py
-│   │   ├── detector.py          # YOLO-based detection
-│   │   └── config.py            # Detection configuration
-│   ├── tracking/                 # Object tracking modules
-│   │   ├── __init__.py
-│   │   ├── tracker.py           # Multi-object tracking
-│   │   └── kalman_filter.py     # Kalman filter implementation
-│   ├── estimation/               # Position estimation modules
-│   │   ├── __init__.py
-│   │   ├── predictor.py         # Future position prediction
-│   │   └── coordinate_mapping.py # 3D coordinate conversion
-│   ├── evaluation/               # Evaluation and analysis modules
-│   │   ├── __init__.py
-│   │   ├── evaluator.py         # Performance evaluation
-│   │   └── visualizer.py        # Visualization tools
-│   └── utils/                    # Utility functions
-│       ├── __init__.py
-│       └── data_utils.py        # Data processing utilities
-├── models/                       # Model weights and configurations
-│   └── ultralytics/             # YOLO model files
-├── datasets/                     # Dataset directory
-├── results/                      # Output results and visualizations
-├── scripts/                      # Execution scripts
-├── requirements.txt              # Python dependencies
-└── README.md                     # Project documentation
+```text
+.
+├── src/
+│   ├── detection/          # YOLO11 vehicle detection
+│   │   ├── detector.py
+│   │   └── config.py
+│   ├── tracking/           # ByteTrack + Kalman filter
+│   │   ├── tracker.py
+│   │   └── kalman_filter.py
+│   ├── estimation/         # Position prediction & 2D→3D mapping
+│   │   ├── predictor.py
+│   │   └── coordinate_mapping.py
+│   ├── evaluation/         # Antenna gain & data rate computation
+│   │   ├── evaluator.py
+│   │   └── visualizer.py
+│   └── utils/
+│       └── data_utils.py
+├── models/                 # Pre-trained weights (auto-downloaded)
+├── datasets/               # DeepSense 6G data
+├── results/                # Output metrics & plots
+├── docs/                   # Demo images
+├── scripts/
+└── requirements.txt
 ```
 
-## Installation
+---
 
-### Prerequisites
-
-- Python 3.8 or higher.
-- CUDA-compatible GPU (recommended for optimal performance).
-- Git.
-
-### Setup Instructions
-
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd Vision-based-Communication
-   ```
-
-2. **Create a virtual environment (recommended)**
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-
-3. **Install dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **Download pre-trained models**
-   The system will automatically download YOLO11n weights on first run, or you can manually download them to `models/ultralytics/weights/`.
-
-## Usage
-
-### 1. Object Detection
-
-Run object detection on images or videos:
-
-```bash
-python src/detection/detector.py \
-    --source_dir datasets/Data4Simulation \
-    --conf_score 0.5 \
-    --visualize \
-    --save_results \
-    --save_dir detection_results
-```
-
-### 2. Object Tracking
-
-Track objects in video sequences:
-
-```bash
-python src/tracking/tracker.py \
-    --input_type folder \
-    --input_path datasets/Data4Simulation \
-    --save_output \
-    --output_file tracked_output.mp4 \
-    --fps 10
-```
-
-### 3. Performance Evaluation
-
-Evaluate tracking performance and communication rates:
-
-```bash
-python src/evaluation/evaluator.py \
-    --input_detection_json detection_results.json \
-    --window_size 5 \
-    --gain_exp_scale 2
-```
-
-### 4. Visualization
-
-Generate performance plots and 3D visualizations:
-
-```bash
-python src/evaluation/visualizer.py \
-    --results_file estimation_results.json \
-    --output_dir results/visualizations
-```
-
-## Configuration
-
-The system uses configuration files for different components:
-
-- **Detection Configuration**: `src/detection/config.py`
-- **Tracking Configuration**: `src/tracking/config.py`
-
-Key parameters include:
-- Model paths and weights.
-- Confidence thresholds.
-- Tracking algorithms.
-- Evaluation metrics.
-
-## Data Format
-
-### Input Data
-- **Images**: Supported formats: JPG, PNG, BMP.
-- **Videos**: Supported formats: MP4, AVI.
-- **Detection Results**: JSON format with bounding box coordinates.
-
-### Output Data
-- **Tracking Results**: JSON format with trajectory data.
-- **Evaluation Metrics**: Performance comparison between baseline and proposed methods.
-- **Visualizations**: PNG plots and MP4 videos.
